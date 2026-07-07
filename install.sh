@@ -121,12 +121,44 @@ for i in $(seq 1 $MAX_WAIT); do
     sleep 2
 done
 
+# --------------- Ожидание сети ---------------
+echo -e "${YELLOW}Ожидаю готовности сети контейнера...${NC}"
+pct exec "$VMID" -- bash -c '
+    echo "Waiting for network..."
+    for i in $(seq 1 30); do
+        if ping -c 1 -W 2 1.1.1.1 >/dev/null 2>&1 && getent hosts security.debian.org >/dev/null 2>&1; then
+            echo "Network is ready"
+            exit 0
+        fi
+        sleep 2
+    done
+    echo "Network not ready after 60s"
+    exit 1
+' || {
+    echo -e "${RED}Контейнер не получил сеть за 60 секунд.${NC}"
+    exit 1
+}
+echo -e "${GREEN}Сеть готова!${NC}"
+
 # --------------- Установка Docker ---------------
 echo -e "${YELLOW}Устанавливаю Docker внутри контейнера...${NC}"
 DOCKER_EXIT=0
 pct exec "$VMID" -- bash -c '
     set -euo pipefail
-    apt-get update -qq
+    APT_RETRY=0
+    APT_MAX_RETRY=3
+    while [ $APT_RETRY -lt $APT_MAX_RETRY ]; do
+        if apt-get update -qq; then
+            break
+        fi
+        APT_RETRY=$((APT_RETRY + 1))
+        echo "apt-get update failed (attempt $APT_RETRY/$APT_MAX_RETRY), retrying..."
+        sleep 3
+    done
+    if [ $APT_RETRY -eq $APT_MAX_RETRY ]; then
+        echo "apt-get update failed after $APT_MAX_RETRY attempts"
+        exit 1
+    fi
     apt-get install -y -qq ca-certificates curl gnupg >/dev/null 2>&1
     install -m 0755 -d /etc/apt/keyrings
     curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg >/dev/null 2>&1
