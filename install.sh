@@ -148,7 +148,7 @@ pct exec "$VMID" -- bash -c '
     APT_RETRY=0
     APT_MAX_RETRY=3
     while [ $APT_RETRY -lt $APT_MAX_RETRY ]; do
-        if apt-get update -qq; then
+        if apt-get update; then
             break
         fi
         APT_RETRY=$((APT_RETRY + 1))
@@ -159,15 +159,29 @@ pct exec "$VMID" -- bash -c '
         echo "apt-get update failed after $APT_MAX_RETRY attempts"
         exit 1
     fi
-    apt-get install -y -qq ca-certificates curl gnupg >/dev/null 2>&1
+
+    echo "Installing prerequisites..."
+    DEBIAN_FRONTEND=noninteractive apt-get install -y ca-certificates curl gnupg
+
+    echo "Adding Docker GPG key..."
     install -m 0755 -d /etc/apt/keyrings
-    curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg >/dev/null 2>&1
+    curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
     chmod a+r /etc/apt/keyrings/docker.gpg
+
+    echo "Adding Docker repository..."
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian bookworm stable" > /etc/apt/sources.list.d/docker.list
-    apt-get update -qq
-    apt-get install -y -qq docker-ce docker-ce-cli containerd.io docker-compose-plugin >/dev/null 2>&1
+
+    echo "Updating package lists (Docker repository)..."
+    apt-get update
+
+    echo "Installing Docker Engine..."
+    DEBIAN_FRONTEND=noninteractive apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+
+    echo "Starting Docker..."
     systemctl enable --now docker
     sleep 2
+
+    echo "Verifying Docker installation..."
     docker info >/dev/null 2>&1
 ' || DOCKER_EXIT=$?
 
