@@ -11,7 +11,7 @@ set -euo pipefail
 # --------------- Настройки ---------------
 CONTAINER_HOSTNAME="domain-list-manager"
 DEBIAN_TEMPLATE="debian-12-standard"
-VM_DISK_SIZE="8G"
+VM_DISK_SIZE="8"
 VM_CPU="2"
 VM_MEMORY="2048"
 VM_BRIDGE="vmbr0"
@@ -65,15 +65,31 @@ else
     echo -e "${GREEN}Шаблон уже присутствует.${NC}"
 fi
 
+TEMPLATE=$(pveam list local \
+    | awk '$1 ~ /^local:vztmpl\/debian-12-standard_/ {print $1}' \
+    | sort -V \
+    | tail -n1)
+
+if [[ -z "$TEMPLATE" ]]; then
+    echo -e "${RED}Не удалось найти шаблон Debian 12.${NC}"
+    exit 1
+fi
+echo -e "${GREEN}Используемый шаблон: ${TEMPLATE}${NC}"
+
 # --------------- Создание LXC ---------------
 echo -e "${YELLOW}Создаю LXC контейнер...${NC}"
 ARCH="$(dpkg --print-architecture)"
+NAMESERVER=$(awk '/^nameserver/ {print $2; exit}' /etc/resolv.conf)
+
+if [[ -z "$NAMESERVER" ]]; then
+    NAMESERVER="8.8.8.8"
+fi
 
 pct create "$VMID" \
-    "local:vztmpl/${DEBIAN_TEMPLATE}.tar.zst" \
+    "$TEMPLATE" \
     -features keyctl=1,nesting=1 \
     -arch "$ARCH" \
-    -name "$CONTAINER_HOSTNAME" \
+    -hostname "$CONTAINER_HOSTNAME" \
     -unprivileged 1 \
     -cores "$VM_CPU" \
     -memory "$VM_MEMORY" \
@@ -81,6 +97,7 @@ pct create "$VMID" \
     -ostype debian \
     -rootfs "local-lvm:${VM_DISK_SIZE}" \
     -net0 "name=eth0,bridge=${VM_BRIDGE},ip=dhcp" \
+    -nameserver "$NAMESERVER" \
     -onboot 1
 
 echo -e "${GREEN}Контейнер создан.${NC}"
