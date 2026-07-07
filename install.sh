@@ -11,7 +11,7 @@ set -euo pipefail
 # --------------- Настройки ---------------
 CONTAINER_HOSTNAME="domain-list-manager"
 DEBIAN_TEMPLATE="debian-12-standard"
-VM_DISK_SIZE="8G"
+VM_DISK_SIZE="8"
 VM_CPU="2"
 VM_MEMORY="2048"
 VM_BRIDGE="vmbr0"
@@ -65,15 +65,31 @@ else
     echo -e "${GREEN}Шаблон уже присутствует.${NC}"
 fi
 
+TEMPLATE=$(pveam list local \
+    | awk '$1 ~ /^local:vztmpl\/debian-12-standard_/ {print $1}' \
+    | sort -V \
+    | tail -n1)
+
+if [[ -z "$TEMPLATE" ]]; then
+    echo -e "${RED}Не удалось найти шаблон Debian 12.${NC}"
+    exit 1
+fi
+echo -e "${GREEN}Используемый шаблон: ${TEMPLATE}${NC}"
+
 # --------------- Создание LXC ---------------
 echo -e "${YELLOW}Создаю LXC контейнер...${NC}"
 ARCH="$(dpkg --print-architecture)"
+NAMESERVER=$(awk '/^nameserver/ {print $2; exit}' /etc/resolv.conf)
+
+if [[ -z "$NAMESERVER" ]]; then
+    NAMESERVER="8.8.8.8"
+fi
 
 pct create "$VMID" \
-    "local:vztmpl/${DEBIAN_TEMPLATE}.tar.zst" \
+    "$TEMPLATE" \
     -features keyctl=1,nesting=1 \
     -arch "$ARCH" \
-    -name "$CONTAINER_HOSTNAME" \
+    -hostname "$CONTAINER_HOSTNAME" \
     -unprivileged 1 \
     -cores "$VM_CPU" \
     -memory "$VM_MEMORY" \
@@ -81,6 +97,7 @@ pct create "$VMID" \
     -ostype debian \
     -rootfs "local-lvm:${VM_DISK_SIZE}" \
     -net0 "name=eth0,bridge=${VM_BRIDGE},ip=dhcp" \
+    -nameserver "$NAMESERVER" \
     -onboot 1
 
 echo -e "${GREEN}Контейнер создан.${NC}"
@@ -104,12 +121,44 @@ for i in $(seq 1 $MAX_WAIT); do
     sleep 2
 done
 
+# --------------- Ожидание сети ---------------
+echo -e "${YELLOW}Ожидаю готовности сети контейнера...${NC}"
+pct exec "$VMID" -- bash -c '
+    echo "Waiting for network..."
+    for i in $(seq 1 30); do
+        if ping -c 1 -W 2 1.1.1.1 >/dev/null 2>&1 && getent hosts security.debian.org >/dev/null 2>&1; then
+            echo "Network is ready"
+            exit 0
+        fi
+        sleep 2
+    done
+    echo "Network not ready after 60s"
+    exit 1
+' || {
+    echo -e "${RED}Контейнер не получил сеть за 60 секунд.${NC}"
+    exit 1
+}
+echo -e "${GREEN}Сеть готова!${NC}"
+
 # --------------- Установка Docker ---------------
 echo -e "${YELLOW}Устанавливаю Docker внутри контейнера...${NC}"
 DOCKER_EXIT=0
-pct exec "$VMID" -- sh -c '
+pct exec "$VMID" -- bash -c '
     set -euo pipefail
-    apt-get update -qq
+    APT_RETRY=0
+    APT_MAX_RETRY=3
+    while [ $APT_RETRY -lt $APT_MAX_RETRY ]; do
+        if apt-get update -qq; then
+            break
+        fi
+        APT_RETRY=$((APT_RETRY + 1))
+        echo "apt-get update failed (attempt $APT_RETRY/$APT_MAX_RETRY), retrying..."
+        sleep 3
+    done
+    if [ $APT_RETRY -eq $APT_MAX_RETRY ]; then
+        echo "apt-get update failed after $APT_MAX_RETRY attempts"
+        exit 1
+    fi
     apt-get install -y -qq ca-certificates curl gnupg >/dev/null 2>&1
     install -m 0755 -d /etc/apt/keyrings
     curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg >/dev/null 2>&1
@@ -150,7 +199,7 @@ pct push "$VMID" "${TMP_DIR}/.env" "/opt/domain-list-manager/.env"
 rm -rf "$TMP_DIR"
 
 COMPOSE_EXIT=0
-pct exec "$VMID" -- sh -c '
+pct exec "$VMID" -- bash -c '
     cd /opt/domain-list-manager
     docker compose pull
     docker compose up -d
