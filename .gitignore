@@ -1,0 +1,33 @@
+# Environment & secrets
+.env
+.env.local
+.env.production
+*.secret
+
+# Build output
+domain-list-manager
+domain-list-manager.exe
+
+# Database
+data/domains.db
+data/*.db
+
+# Output
+output/domains.lst
+output/*.lst
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Logs
+logs/
+*.log
