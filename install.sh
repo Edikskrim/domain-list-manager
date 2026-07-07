@@ -124,7 +124,7 @@ done
 # --------------- Установка Docker ---------------
 echo -e "${YELLOW}Устанавливаю Docker внутри контейнера...${NC}"
 DOCKER_EXIT=0
-pct exec "$VMID" -- sh -c '
+pct exec "$VMID" -- bash -c '
     set -euo pipefail
     apt-get update -qq
     apt-get install -y -qq ca-certificates curl gnupg >/dev/null 2>&1
@@ -167,7 +167,7 @@ pct push "$VMID" "${TMP_DIR}/.env" "/opt/domain-list-manager/.env"
 rm -rf "$TMP_DIR"
 
 COMPOSE_EXIT=0
-pct exec "$VMID" -- sh -c '
+pct exec "$VMID" -- bash -c '
     cd /opt/domain-list-manager
     docker compose pull
     docker compose up -d
