@@ -80,9 +80,9 @@ pct create "$VMID" \
     -swap 512 \
     -ostype debian \
     -rootfs "local-lvm:${VM_DISK_SIZE}" \
-    -net0 "name=eth0,bridge=${VM_BRIDGE},ip=dhcp,gw=dhcp" \
-    -onboot 1 \
-    -startup "up"
+    -net0 "name=eth0,bridge=${VM_BRIDGE},ip=dhcp" \
+    -nameserver "8.8.8.8 8.8.4.4" \
+    -onboot 1
 
 echo -e "${GREEN}Контейнер создан.${NC}"
 
