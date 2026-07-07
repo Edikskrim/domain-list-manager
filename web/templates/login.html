@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Вход — Domain List Manager</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+</head>
+<body>
+    <div class="container" style="max-width: 400px; margin-top: 100px;">
+        <h2>Вход</h2>
+        {{ if .Error }}
+        <div style="color: var(--danger);" role="alert">{{ .Error }}</div>
+        {{ end }}
+        <form method="POST" action="/login">
+            <label>
+                Имя пользователя
+                <input type="text" name="username" required autofocus>
+            </label>
+            <label>
+                Пароль
+                <input type="password" name="password" required>
+            </label>
+            <button type="submit">Войти</button>
+        </form>
+    </div>
+</body>
+</html>

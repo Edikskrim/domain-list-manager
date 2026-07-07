@@ -1,0 +1,290 @@
+﻿<h1 class="section-title">&#128222; Домены</h1>
+
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:0.5rem;">
+    <div class="search-bar" style="flex:1;margin:0;">
+        <input type="text" id="domain-search" placeholder="Поиск домена..." value="{{ .Search }}" style="flex:1;">
+        <select id="domain-source-filter" style="min-width:150px;">
+            <option value="">Все источники</option>
+            {{ range .SourceOptions }}
+            <option value="{{ .ID }}"{{ if eq .ID $.SelectedSource }} selected{{ end }}>{{ .Name }}</option>
+            {{ end }}
+        </select>
+        <button class="button" onclick="applyFilters()">Найти</button>
+        <button class="button button-secondary" onclick="resetFilters()">Сброс</button>
+    </div>
+    <div style="display:flex;gap:0.5rem;">
+        <button class="button button-success" onclick="showAddDomainModal()">&#10133; Добавить</button>
+        <button class="button button-secondary" onclick="showBulkAddModal()">&#128203; Массово</button>
+    </div>
+</div>
+
+<div class="card">
+    <h3>&#127760; Список доменов</h3>
+    {{ if gt (len .Domains) 0 }}
+    <div style="overflow-x:auto;max-height:600px;overflow-y:auto;">
+        <table class="data-table" id="domains-table">
+            <thead>
+                <tr>
+                    <th class="sortable" data-field="name" data-dir="{{ .Dir }}" data-active="{{ if eq .Sort "name" }}true{{ else }}false{{ end }}">
+                        &#128222; Домен
+                        {{ if eq .Sort "name" }}{{ if eq .Dir "asc" }}&#x25B2;{{ else }}&#x25BC;{{ end }}{{ end }}
+                    </th>
+                    <th class="sortable" data-field="source" data-dir="{{ .Dir }}" data-active="{{ if eq .Sort "source" }}true{{ else }}false{{ end }}">
+                        &#128203; Источник
+                        {{ if eq .Sort "source" }}{{ if eq .Dir "asc" }}&#x25B2;{{ else }}&#x25BC;{{ end }}{{ end }}
+                    </th>
+                    <th class="sortable" data-field="created_at" data-dir="{{ .Dir }}" data-active="{{ if eq .Sort "created_at" }}true{{ else }}false{{ end }}">
+                        &#128197; Создан
+                        {{ if eq .Sort "created_at" }}{{ if eq .Dir "asc" }}&#x25B2;{{ else }}&#x25BC;{{ end }}{{ end }}
+                    </th>
+                    <th>&#x1F527; Действия</th>
+                </tr>
+            </thead>
+            <tbody id="domains-tbody">
+                {{ range .Domains }}
+                <tr data-domain-id="{{ .ID }}">
+                    <td><strong>{{ .Name }}</strong></td>
+                    <td>{{ .Source }}</td>
+                    <td>{{ .CreatedAt }}</td>
+                    <td class="actions">
+                        <button class="button button-small button-secondary" onclick="viewDomain('{{ .ID }}')">&#128065;</button>
+                        <button class="button button-small button-warning" onclick="editDomain('{{ .ID }}')">&#9998;</button>
+                        <button class="button button-small button-danger" onclick="deleteDomain('{{ .ID }}')">&#128465;</button>
+                    </td>
+                </tr>
+                {{ end }}
+            </tbody>
+        </table>
+    </div>
+    <div style="margin-top:1rem;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
+        <span class="text-sm" style="color:#666;">Всего: {{ .TotalCount }} доменов (стр. {{ .Page }}/{{ .TotalPages }})</span>
+        <div style="display:flex;gap:0.25rem;flex-wrap:wrap;">
+            <div style="display:flex;gap:0.25rem;flex-wrap:wrap;">
+                {{ range .PaginationLinks }}
+                {{ if eq .Type "link" }}
+                <a href="{{ .Href }}" class="button button-small{{ if .Active }} button-success{{ end }}">{{ .Label }}</a>
+                {{ else }}
+                <span style="padding:0.25rem 0.5rem;">...</span>
+                {{ end }}
+                {{ end }}
+            </div>
+        </div>
+    </div>
+    {{ else }}
+    <div class="empty-state">
+        <div class="icon">&#128222;</div>
+        <p>Нет доменов в базе данных</p>
+        <a href="/ui/sources" class="button" style="text-decoration:none;">&#128203; Настроить источники</a>
+    </div>
+    {{ end }}
+</div>
+
+<div style="margin-top:2rem;display:flex;gap:1rem;flex-wrap:wrap;">
+    <a href="/ui/sources" class="button" style="text-decoration:none;">&#128203; Источники</a>
+    <a href="/ui/history" class="button" style="text-decoration:none;">&#128339; История</a>
+    <a href="/ui/diagnostics" class="button" style="text-decoration:none;">&#128269; Диагностика</a>
+    <a href="/ui/intersections" class="button" style="text-decoration:none;">&#128391; Пересечения</a>
+</div>
+
+<script>
+function applyFilters() {
+    const search = document.getElementById('domain-search').value;
+    const source = document.getElementById('domain-source-filter').value;
+    const params = new URLSearchParams(window.location.search);
+    if (search) params.set('search', search);
+    else params.delete('search');
+    if (source) params.set('source', source);
+    else params.delete('source');
+    window.location.search = params.toString();
+}
+
+function resetFilters() {
+    document.getElementById('domain-search').value = '';
+    document.getElementById('domain-source-filter').value = '';
+    window.location.search = '';
+}
+
+function viewDomain(id) {
+    fetch(`/api/v1/domains/${id}`)
+        .then(r => r.json())
+        .then(data => {
+            showDomainModal(data);
+        })
+        .catch(err => alert('Ошибка: ' + err.message));
+}
+
+function showDomainModal(data) {
+    const modal = document.createElement('div');
+    modal.setAttribute('data-modal', 'overlay');
+    modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:1000;';
+    modal.innerHTML = `
+        <div style="background:#fff;padding:2rem;border-radius:0.5rem;max-width:600px;width:90%;max-height:80vh;overflow-y:auto;">
+            <h3>&#128222; Детали домена</h3>
+            <dl>
+                <dt>ID</dt><dd style="font-family:monospace;">${data.id || data.ID || 'N/A'}</dd>
+                <dt>Name</dt><dd><strong>${data.name || data.Name || 'N/A'}</strong></dd>
+                <dt>Created</dt><dd>${data.created_at || data.CreatedAt || 'N/A'}</dd>
+                <dt>Updated</dt><dd>${data.updated_at || data.UpdatedAt || 'N/A'}</dd>
+            </dl>
+            <button class="button button-secondary" data-close-modal style="margin-top:1rem;">Закрыть</button>
+        </div>
+    `;
+    modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+    document.body.appendChild(modal);
+}
+
+function editDomain(id) {
+    fetch(`/api/v1/domains/${id}`)
+        .then(r => r.json())
+        .then(data => showEditDomainModal(data))
+        .catch(err => alert('Ошибка: ' + err.message));
+}
+
+function showEditDomainModal(data) {
+    const modal = createModal(`
+        <h3>&#9998; Редактировать домен</h3>
+        <form id="edit-domain-form" style="display:flex;flex-direction:column;gap:1rem;">
+            <div>
+                <label>ID</label>
+                <div style="font-family:monospace;font-size:0.9rem;color:#666;padding:0.5rem 0;">${data.id || data.ID || ''}</div>
+            </div>
+            <div>
+                <label>Домен</label>
+                <input type="text" id="edit-domain-name" value="${data.name || data.Name || ''}" required style="width:100%;padding:0.5rem;border:1px solid #ddd;border-radius:4px;">
+            </div>
+            <div style="display:flex;gap:0.5rem;justify-content:flex-end;">
+                <button type="button" class="button button-secondary" data-close-modal>Отмена</button>
+                <button type="submit" class="button button-warning">&#9998; Сохранить</button>
+            </div>
+        </form>
+    `);
+    document.getElementById('edit-domain-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const name = document.getElementById('edit-domain-name').value.trim();
+        if (!name) return;
+        fetch(`/api/v1/domains/${data.id || data.ID}`, {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({name: name}),
+            credentials: 'include'
+        })
+        .then(r => {
+            if (r.ok) {
+                window.location.reload();
+            } else {
+                alert('Ошибка: не удалось обновить домен');
+            }
+        })
+        .catch(err => alert('Ошибка: ' + err.message));
+    });
+}
+
+function deleteDomain(id) {
+    if (!confirm(`Удалить домен ${id}?`)) return;
+    fetch(`/api/v1/domains/${id}`, { method: 'DELETE', credentials: 'include' })
+        .then(r => { if (r.ok) window.location.reload(); else alert('Ошибка удаления'); })
+        .catch(err => alert('Ошибка: ' + err.message));
+}
+
+function showAddDomainModal() {
+    const modal = createModal(`
+        <h3>&#10133; Добавить домен</h3>
+        <form id="add-domain-form" style="display:flex;flex-direction:column;gap:1rem;">
+            <div>
+                <label>Домен</label>
+                <input type="text" id="domain-name-input" placeholder="example.com" required style="width:100%;padding:0.5rem;border:1px solid #ddd;border-radius:4px;">
+            </div>
+            <div style="display:flex;gap:0.5rem;justify-content:flex-end;">
+                <button type="button" class="button button-secondary" data-close-modal>Отмена</button>
+                <button type="submit" class="button button-success">&#10133; Добавить</button>
+            </div>
+        </form>
+    `);
+    document.getElementById('add-domain-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const name = document.getElementById('domain-name-input').value.trim();
+        if (!name) return;
+        fetch('/api/v1/domains', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({name: name}),
+            credentials: 'include'
+        })
+        .then(async r => {
+            const data = await r.json();
+            if (r.ok && data.success) {
+                showToast('\u2713 \u0414\u043E\u043C\u0435\u043D \u0443\u0441\u043F\u0435\u0448\u043D\u043E \u0434\u043E\u0431\u0430\u0432\u043B\u0435\u043D!');
+                window.location.href = '/ui/domains?page=1';
+            } else {
+                alert('\u041E\u0448\u0438\u0431\u043A\u0430: ' + (data.message || '\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0434\u043E\u0431\u0430\u0432\u0438\u0442\u044C'));
+            }
+        })
+        .catch(err => alert('\u041E\u0448\u0438\u0431\u043A\u0430: ' + err.message));
+    });
+}
+
+function showBulkAddModal() {
+    const modal = createModal(`
+        <h3>&#128203; Массовое добавление доменов</h3>
+        <form id="bulk-add-form" style="display:flex;flex-direction:column;gap:1rem;">
+            <div>
+                <label>Список доменов (по одному на строку)</label>
+                <textarea id="bulk-domains-input" placeholder="example.com&#10;test.com&#10;domain.org" rows="8" style="width:100%;padding:0.5rem;border:1px solid #ddd;border-radius:4px;font-family:monospace;font-size:0.9rem;" required></textarea>
+                <small style="color:#666;">Вставьте домены, по одному на каждую строку</small>
+            </div>
+            <div style="display:flex;gap:0.5rem;justify-content:flex-end;">
+                <button type="button" class="button button-secondary" data-close-modal>Отмена</button>
+                <button type="submit" class="button button-success">&#128203; Добавить все</button>
+            </div>
+        </form>
+    `);
+    document.getElementById('bulk-add-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const text = document.getElementById('bulk-domains-input').value.trim();
+        if (!text) return;
+        const names = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+        fetch('/api/v1/domains/bulk', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(names),
+            credentials: 'include'
+        })
+        .then(async r => {
+            const data = await r.json();
+            if (r.ok && data.success) {
+                showToast('\u2713 \u0414\u043E\u043C\u0435\u043D\u044B \u0443\u0441\u043F\u0435\u0448\u043D\u043E \u0434\u043E\u0431\u0430\u0432\u043B\u0435\u043D\u044B!');
+                window.location.href = '/ui/domains?page=1';
+            } else {
+                alert('\u041E\u0448\u0438\u0431\u043A\u0430: ' + (data.message || '\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0434\u043E\u0431\u0430\u0432\u0438\u0442\u044C'));
+            }
+        })
+        .catch(err => alert('\u041E\u0448\u0438\u0431\u043A\u0430: ' + err.message));
+    });
+}
+
+function showToast(message) {
+    const toast = document.createElement('div');
+    toast.textContent = message;
+    toast.style.cssText = 'position:fixed;bottom:2rem;right:2rem;background:#22c55e;color:#fff;padding:1rem 1.5rem;border-radius:0.5rem;box-shadow:0 4px 12px rgba(0,0,0,0.15);z-index:2000;font-size:0.9rem;animation:fadeInOut 3s ease-in-out;';
+    document.body.appendChild(toast);
+    setTimeout(() => { toast.style.opacity = '0'; toast.style.transition = 'opacity 0.5s'; setTimeout(() => toast.remove(), 500); }, 2500);
+}
+
+function createModal(contentHTML) {
+    const overlay = document.createElement('div');
+    overlay.setAttribute('data-modal', 'overlay');
+    overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:1000;';
+    document.body.appendChild(overlay);
+    const content = document.createElement('div');
+    content.style.cssText = 'background:#fff;padding:2rem;border-radius:0.5rem;max-width:600px;width:90%;max-height:80vh;overflow-y:auto;';
+    content.innerHTML = contentHTML;
+    overlay.appendChild(content);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+    content.querySelectorAll('[data-close-modal]').forEach(btn => {
+        btn.addEventListener('click', function() { overlay.remove(); });
+    });
+    return overlay;
+}
+
+
+</script>

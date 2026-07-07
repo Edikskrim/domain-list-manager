@@ -1,0 +1,114 @@
+﻿<h1 class="section-title">&#x1F504; Сравнение снимков</h1>
+
+<div class="search-bar">
+    <select id="diff-snapshot-1" style="flex:1;min-width:200px;">
+        <option value="">— Выберите первый снимок —</option>
+    </select>
+    <span style="display:flex;align-items:center;font-weight:600;">&#x2194;</span>
+    <select id="diff-snapshot-2" style="flex:1;min-width:200px;">
+        <option value="">— Выберите второй снимок —</option>
+    </select>
+    <button class="button" onclick="loadDiff()">Сравнить</button>
+</div>
+
+{{ if .Diff }}
+<div class="stat-cards">
+    <div class="stat-card positive">
+        <div class="stat-label">&#x2795; Добавлено</div>
+        <div class="stat-value">{{ .Diff.AddedCount }}</div>
+    </div>
+    <div class="stat-card negative">
+        <div class="stat-label">&#x2796; Удалено</div>
+        <div class="stat-value">{{ .Diff.RemovedCount }}</div>
+    </div>
+    <div class="stat-card neutral">
+        <div class="stat-label">&#x1F4C5; Снимок 1</div>
+        <div class="stat-value" style="font-size:1rem;">{{ .Diff.TotalDomains1 }}</div>
+    </div>
+    <div class="stat-card neutral">
+        <div class="stat-label">&#x1F4C5; Снимок 2</div>
+        <div class="stat-value" style="font-size:1rem;">{{ .Diff.TotalDomains2 }}</div>
+    </div>
+</div>
+
+<div class="card" style="border-left:4px solid #28a745;">
+    <h3>&#x2795; Добавленные домены ({{ .Diff.AddedCount }})</h3>
+    {{ if .Diff.Added }}
+    <div style="overflow-x:auto;max-height:400px;overflow-y:auto;">
+        <table class="data-table">
+            <tbody>
+                {{ range .Diff.Added }}
+                <tr>
+                    <td><span class="diff-added">&#x2795; {{ . }}</span></td>
+                </tr>
+                {{ end }}
+            </tbody>
+        </table>
+    </div>
+    {{ else }}
+    <p style="color:#666;">Нет добавленных доменов</p>
+    {{ end }}
+</div>
+
+<div class="card" style="border-left:4px solid #dc3545;">
+    <h3>&#x2796; Удалённые домены ({{ .Diff.RemovedCount }})</h3>
+    {{ if .Diff.Removed }}
+    <div style="overflow-x:auto;max-height:400px;overflow-y:auto;">
+        <table class="data-table">
+            <tbody>
+                {{ range .Diff.Removed }}
+                <tr>
+                    <td><span class="diff-removed">&#x2796; {{ . }}</span></td>
+                </tr>
+                {{ end }}
+            </tbody>
+        </table>
+    </div>
+    {{ else }}
+    <p style="color:#666;">Нет удалённых доменов</p>
+    {{ end }}
+</div>
+{{ else }}
+<div class="empty-state">
+    <div class="icon">&#x1F504;</div>
+    <p>Выберите два снимка для сравнения</p>
+</div>
+{{ end }}
+
+<div style="margin-top:2rem;display:flex;gap:1rem;flex-wrap:wrap;">
+    <a href="/ui/history" class="button" style="text-decoration:none;">&#x2190; Назад к истории</a>
+    <a href="/ui/diagnostics" class="button" style="text-decoration:none;">&#128269; Диагностика</a>
+    <a href="/ui/intersections" class="button" style="text-decoration:none;">&#128391; Пересечения</a>
+</div>
+
+<script>
+function loadDiff() {
+    const s1 = document.getElementById('diff-snapshot-1').value;
+    const s2 = document.getElementById('diff-snapshot-2').value;
+    if (!s1 || !s2) { alert('Выберите оба снимка'); return; }
+    window.location.href = `/ui/history/diff?s1=${s1}&s2=${s2}`;
+}
+
+// Load snapshots for both selectors
+function loadSnapshots() {
+    fetch('/api/v1/history')
+        .then(r => r.json())
+        .then(data => {
+            const snap = data.data || data;
+            const snapshots = snap.snapshots || [];
+            
+            ['diff-snapshot-1', 'diff-snapshot-2'].forEach(id => {
+                const select = document.getElementById(id);
+                snapshots.forEach(s => {
+                    const opt = document.createElement('option');
+                    opt.value = s.id;
+                    opt.textContent = `${s.id} (${s.total_domains || s.TotalDomains || 0} доменов)`;
+                    select.appendChild(opt.cloneNode(true));
+                });
+            });
+        })
+        .catch(() => {});
+}
+
+document.addEventListener('DOMContentLoaded', loadSnapshots);
+</script>

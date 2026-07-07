@@ -1,0 +1,175 @@
+﻿<h1 class="section-title">&#128269; Диагностика</h1>
+
+<div class="search-bar">
+    <button class="button" onclick="refreshDiagnostics()">&#x1F504; Обновить</button>
+    <button class="button button-secondary" onclick="window.location.href='/ui/domains'">&#127760; Домены</button>
+</div>
+
+{{ if .Diagnostics }}
+<div class="stat-cards">
+    <div class="stat-card neutral">
+        <div class="stat-label">&#128203; Всего источников</div>
+        <div class="stat-value">{{ .Diagnostics.OverallSummary.TotalSources }}</div>
+    </div>
+    <div class="stat-card positive">
+        <div class="stat-label">&#x2705; Активных</div>
+        <div class="stat-value">{{ .Diagnostics.OverallSummary.EnabledSources }}</div>
+    </div>
+    <div class="stat-card negative">
+        <div class="stat-label">&#x274C; Ошибок парсинга</div>
+        <div class="stat-value">{{ .Diagnostics.OverallSummary.ParsingErrorCount }}</div>
+    </div>
+    <div class="stat-card warning">
+        <div class="stat-label">&#x1F504; Пересечений</div>
+        <div class="stat-value">{{ .Diagnostics.OverallSummary.IntersectingCount }}</div>
+    </div>
+    <div class="stat-card neutral">
+        <div class="stat-label">&#128222; Невалидных</div>
+        <div class="stat-value">{{ .Diagnostics.OverallSummary.InvalidDomainCount }}</div>
+    </div>
+    <div class="stat-card positive">
+        <div class="stat-label">&#x1F552; Анализировано</div>
+        <div class="stat-value" style="font-size:1rem;">{{ .Diagnostics.AnalyzedAt }}</div>
+    </div>
+</div>
+
+{{ if .Diagnostics.InvalidDomains }}
+<div class="card" style="border-left:4px solid #dc3545;">
+    <h3>&#x274C; Невалидные домены ({{ len .Diagnostics.InvalidDomains }})</h3>
+    {{ if .Diagnostics.InvalidDomains }}
+    <div style="overflow-x:auto;max-height:400px;overflow-y:auto;">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>&#128222; Домен</th>
+                    <th>&#x1F4AC; Причина</th>
+                    <th>&#128203; Источник</th>
+                    <th>&#128203; Кол-во</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{ range .Diagnostics.InvalidDomains }}
+                <tr>
+                    <td><strong>{{ .Domain }}</strong></td>
+                    <td>{{ .Reason }}</td>
+                    <td>{{ .Source }}</td>
+                    <td>{{ .Count }}</td>
+                    <td class="actions">
+                        <button class="button button-small button-danger" onclick="deleteInvalidDomain('{{ .Domain }}', '{{ .Source }}')" title="Удалить">&#128465;</button>
+                    </td>
+                </tr>
+                {{ end }}
+            </tbody>
+        </table>
+    </div>
+    {{ else }}
+    <p style="color:#666;">Нет невалидных доменов</p>
+    {{ end }}
+</div>
+{{ end }}
+
+{{ if .Diagnostics.ParsingErrors }}
+<div class="card" style="border-left:4px solid #f57c00;">
+    <h3>&#x1F6A8; Ошибки парсинга ({{ len .Diagnostics.ParsingErrors }})</h3>
+    <div style="overflow-x:auto;max-height:400px;overflow-y:auto;">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>&#128203; Источник</th>
+                    <th>&#x1F4AC; Ошибка</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{ range .Diagnostics.ParsingErrors }}
+                <tr>
+                    <td><strong>{{ .SourceName }}</strong></td>
+                    <td style="color:#721c24;">{{ .Error }}</td>
+                </tr>
+                {{ end }}
+            </tbody>
+        </table>
+    </div>
+</div>
+{{ end }}
+
+{{ if .Diagnostics.Intersections.IntersectingDomains }}
+<div class="card" style="border-left:4px solid #4a90d9;">
+    <h3>&#x1F504; Пересечения доменов ({{ len .Diagnostics.Intersections.IntersectingDomains }})</h3>
+    <div class="stat-cards" style="margin-bottom:1rem;">
+        <div class="stat-card neutral">
+            <div class="stat-label">Всего источников</div>
+            <div class="stat-value">{{ .Diagnostics.Intersections.Summary.TotalSources }}</div>
+        </div>
+        <div class="stat-card positive">
+            <div class="stat-label">Всего доменов</div>
+            <div class="stat-value">{{ .Diagnostics.Intersections.Summary.TotalDomains }}</div>
+        </div>
+        <div class="stat-card warning">
+            <div class="stat-label">Пересекающихся</div>
+            <div class="stat-value">{{ .Diagnostics.Intersections.Summary.IntersectingCount }}</div>
+        </div>
+        <div class="stat-card neutral">
+            <div class="stat-label">Уникальных</div>
+            <div class="stat-value">{{ .Diagnostics.Intersections.Summary.UniqueCount }}</div>
+        </div>
+    </div>
+    {{ if .Diagnostics.Intersections.IntersectingDomains }}
+    <div style="overflow-x:auto;max-height:400px;overflow-y:auto;">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>&#128222; Домен</th>
+                    <th>&#128203; Источников</th>
+                    <th>&#x1F517; Источники</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{ range .Diagnostics.Intersections.IntersectingDomains }}
+                <tr>
+                    <td><strong>{{ .Domain }}</strong></td>
+                    <td>{{ .SourceCount }}</td>
+                    <td>
+                        {{ range .Sources }}
+                        <span class="badge badge-info" style="margin:0.1rem;">{{ . }}</span>
+                        {{ end }}
+                    </td>
+                </tr>
+                {{ end }}
+            </tbody>
+        </table>
+    </div>
+    {{ end }}
+</div>
+{{ end }}
+{{ else }}
+<div class="empty-state">
+    <div class="icon">&#128269;</div>
+    <p>Запустите диагностику для получения результатов</p>
+    <button class="button" onclick="refreshDiagnostics()">&#x1F504; Запустить</button>
+</div>
+{{ end }}
+
+<script>
+function refreshDiagnostics() {
+    fetch('/api/v1/diagnostics')
+        .then(r => r.json())
+        .then(() => { window.location.reload(); })
+        .catch(() => alert('Ошибка обновления диагностики'));
+}
+
+function deleteInvalidDomain(domain, source) {
+    if (!confirm(`Удалить домен "${domain}" из источника "${source}"?`)) return;
+    fetch(`/api/v1/domains?name=${encodeURIComponent(domain)}&source_id=${encodeURIComponent(source)}`, {
+        method: 'DELETE',
+        credentials: 'include'
+    })
+    .then(r => {
+        if (r.ok) {
+            window.location.reload();
+        } else {
+            r.json().then(data => alert('Ошибка удаления: ' + (data.message || 'Неизвестная ошибка')));
+        }
+    })
+    .catch(err => alert('Ошибка: ' + err.message));
+}
+</script>

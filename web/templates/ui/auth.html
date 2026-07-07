@@ -1,0 +1,50 @@
+﻿<h1 class="section-title">&#128275; Аутентификация</h1>
+
+<div class="card">
+    <h3>Статус сессии</h3>
+    {{ if .HasCookie }}
+    <div style="color:#2d6a4f;padding:1rem;background:#d4edda;border-radius:6px;">
+        <strong>&#9989;</strong> Вы авторизованы
+    </div>
+    <table class="data-table" style="margin-top:1rem;">
+        <tr>
+            <th>Параметр</th>
+            <th>Значение</th>
+        </tr>
+        <tr>
+            <td>Имя куки</td>
+            <td><code>dlm_session</code></td>
+        </tr>
+        <tr>
+            <td>Значение (хеш)</td>
+            <td><code>{{ .Cookie }}</code></td>
+        </tr>
+    </table>
+    <a href="/ui/logout" class="button" style="text-decoration:none;margin-top:1rem;">&#128683; Выйти</a>
+    {{ else }}
+    <div style="color:#d32f2f;padding:1rem;background:#f8d7da;border-radius:6px;">
+        <strong>&#10060;</strong> Вы не авторизованы
+    </div>
+    <a href="/ui/login" class="button" style="text-decoration:none;margin-top:1rem;">&#128275; Войти</a>
+    {{ end }}
+</div>
+
+<div class="card">
+    <h3>Информация о защите</h3>
+    <table class="data-table">
+        <tr>
+            <th>Метод</th>
+            <th>Описание</th>
+        </tr>
+        <tr>
+            <td>Cookie-аутентификация</td>
+            <td>Сессия хранится в HTTP-only куки с именем dlm_session</td>
+        </tr>
+        <tr>
+            <td>Middleware</td>
+            <td>Все защищённые маршруты требуют действительную сессию</td>
+        </tr>
+    </table>
+</div>
+
+<a href="/ui/" class="button" style="text-decoration:none;">&#8592; Назад</a>

@@ -1,0 +1,234 @@
+﻿<h1 class="section-title">&#128391; Пересечения доменов</h1>
+
+<div class="search-bar">
+    <button class="button" onclick="refreshIntersections()">&#x1F504; Обновить</button>
+    <input type="text" id="intersection-search" placeholder="Поиск домена..." style="flex:1;">
+    <button class="button button-secondary" onclick="filterIntersections()">&#128269;</button>
+</div>
+
+{{ if .Intersections }}
+<div class="stat-cards">
+    <div class="stat-card neutral">
+        <div class="stat-label">&#128203; Всего источников</div>
+        <div class="stat-value">{{ .Intersections.Summary.TotalSources }}</div>
+    </div>
+    <div class="stat-card positive">
+        <div class="stat-label">&#128222; Всего доменов</div>
+        <div class="stat-value">{{ .Intersections.Summary.TotalDomains }}</div>
+    </div>
+    <div class="stat-card warning">
+        <div class="stat-label">&#x1F504; Пересечений</div>
+        <div class="stat-value">{{ .Intersections.Summary.IntersectingCount }}</div>
+    </div>
+    <div class="stat-card neutral">
+        <div class="stat-label">&#x2705; Уникальных</div>
+        <div class="stat-value">{{ .Intersections.Summary.UniqueCount }}</div>
+    </div>
+    <div class="stat-card positive">
+        <div class="stat-label">&#x1F552; Проанализировано</div>
+        <div class="stat-value" style="font-size:1rem;">{{ .Intersections.AnalyzedAt }}</div>
+    </div>
+</div>
+
+{{ if .Intersections.IntersectingDomains }}
+<div class="card">
+    <h3>&#x1F504; Пересекающиеся домены ({{ len .Intersections.IntersectingDomains }})</h3>
+    <div style="overflow-x:auto;max-height:600px;overflow-y:auto;">
+        <table class="data-table" id="intersections-table">
+            <thead>
+                <tr>
+                    <th class="sortable" data-field="domain">&#128222; Домен</th>
+                    <th class="sortable" data-field="source_count">&#128203; Кол-во источников</th>
+                    <th>&#x1F517; Источники</th>
+                </tr>
+            </thead>
+            <tbody id="intersections-tbody">
+                {{ range .Intersections.IntersectingDomains }}
+                <tr class="intersection-row">
+                    <td><strong>{{ .Domain }}</strong></td>
+                    <td>{{ .SourceCount }}</td>
+                    <td>
+                        {{ range .Sources }}
+                        <span class="badge badge-info" style="margin:0.1rem;">{{ . }}</span>
+                        {{ end }}
+                    </td>
+                    <td class="actions">
+                        <button class="button button-small button-info" onclick="showIntersectionDetails('{{ .Domain }}')">&#128065;</button>
+                    </td>
+                </tr>
+                {{ end }}
+            </tbody>
+        </table>
+    </div>
+</div>
+{{ end }}
+
+{{ if .Intersections.SourceDomains }}
+<div class="card">
+    <h3>&#128203; Домены по источникам ({{ len .Intersections.SourceDomains }})</h3>
+    <div style="overflow-x:auto;max-height:400px;overflow-y:auto;">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>&#128203; Источник</th>
+                    <th>&#128203; ID</th>
+                    <th>&#127760; Кол-во доменов</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{ range .Intersections.SourceDomains }}
+                <tr>
+                    <td><strong>{{ .SourceName }}</strong></td>
+                    <td style="font-family:monospace;font-size:0.85rem;">{{ .SourceID }}</td>
+                    <td><span class="badge badge-info">{{ .DomainCount }}</span></td>
+                </tr>
+                {{ end }}
+            </tbody>
+        </table>
+    </div>
+</div>
+{{ end }}
+
+{{ if .Intersections.UniqueDomains }}
+<div class="card" style="border-left:4px solid #28a745;">
+    <h3>&#x2705; Уникальные домены ({{ len .Intersections.UniqueDomains }})</h3>
+    <div style="overflow-x:auto;max-height:400px;overflow-y:auto;">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>&#128222; Домен</th>
+                    <th>&#128203; Источник</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{ range .Intersections.UniqueDomains }}
+                <tr>
+                    <td>{{ .Domain }}</td>
+                    <td><span class="badge badge-success">{{ .Source }}</span></td>
+                </tr>
+                {{ end }}
+            </tbody>
+        </table>
+    </div>
+</div>
+{{ end }}
+{{ else }}
+<div class="empty-state">
+    <div class="icon">&#128391;</div>
+    <p>Запустите анализ пересечений</p>
+    <button class="button" onclick="refreshIntersections()">&#x1F504; Анализ</button>
+</div>
+{{ end }}
+
+<div style="margin-top:2rem;display:flex;gap:1rem;flex-wrap:wrap;">
+    <a href="/ui/domains" class="button" style="text-decoration:none;">&#127760; Домены</a>
+    <a href="/ui/sources" class="button" style="text-decoration:none;">&#128203; Источники</a>
+    <a href="/ui/diagnostics" class="button" style="text-decoration:none;">&#128269; Диагностика</a>
+</div>
+
+<script>
+function refreshIntersections() {
+    fetch('/api/v1/intersections')
+        .then(r => r.json())
+        .then(() => { window.location.reload(); })
+        .catch(() => alert('Ошибка обновления'));
+}
+
+function filterIntersections() {
+    const filter = document.getElementById('intersection-search').value.toLowerCase();
+    const rows = document.querySelectorAll('.intersection-row');
+    rows.forEach(row => {
+        const name = row.querySelector('td:first-child').textContent.toLowerCase();
+        row.style.display = name.includes(filter) ? '' : 'none';
+    });
+}
+
+document.getElementById('intersection-search')?.addEventListener('input', () => {
+    filterIntersections();
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.sortable').forEach(th => {
+        th.addEventListener('click', () => {
+            const field = th.dataset.field;
+            const params = new URLSearchParams(window.location.search);
+            params.set('sort', field);
+            params.set('dir', params.get('dir') === 'asc' ? 'desc' : 'asc');
+            window.location.search = params.toString();
+        });
+    });
+});
+
+function showIntersectionDetails(domain) {
+    fetch(`/api/v1/intersections/sources/${encodeURIComponent(domain)}`)
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                showIntersectionDetailsModal(data.data.domain, data.data.sources);
+            } else {
+                alert('Ошибка загрузки данных');
+            }
+        })
+        .catch(err => alert('Ошибка: ' + err.message));
+}
+
+function showIntersectionDetailsModal(domainName, sources) {
+    let rowsHTML = '';
+    if (sources && sources.length > 0) {
+        rowsHTML = sources.map(s => `
+            <tr>
+                <td style="font-family:monospace;font-size:0.85rem;">${s.id || 'N/A'}</td>
+                <td><strong>${s.name || domainName}</strong></td>
+                <td><span class="badge badge-info">${s.source_id || 'не указан'}</span></td>
+                <td class="actions">
+                    <button class="button button-small button-danger" onclick="deleteDomainFromSource('${s.id || ''}')">&#128465;</button>
+                </td>
+            </tr>
+        `).join('');
+    } else {
+        rowsHTML = '<tr><td colspan="4" style="color:#666;">Нет данных</td></tr>';
+    }
+
+    const modal = createModal(`
+        <h3>&#128222; Пересечения для: <strong>${domainName}</strong></h3>
+        <p style="color:#666;margin-bottom:1rem;">Найдено в источниках:</p>
+        <table class="data-table" style="margin-bottom:1rem;">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Домен</th>
+                    <th>Источник</th>
+                    <th>Действия</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${rowsHTML}
+            </tbody>
+        </table>
+        <div style="display:flex;gap:0.5rem;justify-content:flex-end;">
+            <button class="button button-secondary" data-close-modal>Закрыть</button>
+        </div>
+    `);
+    window._currentDeleteDomainId = null;
+}
+
+function deleteDomainFromSource(id) {
+    if (!id) {
+        alert('Не указан ID домена');
+        return;
+    }
+    if (!confirm('Удалить этот домен?')) return;
+    fetch(`/api/v1/domains/${id}`, {
+        method: 'DELETE',
+        credentials: 'include'
+    })
+    .then(r => {
+        if (r.ok) {
+            window.location.reload();
+        } else {
+            alert('Ошибка удаления');
+        }
+    })
+    .catch(err => alert('Ошибка: ' + err.message));
+}
+</script>

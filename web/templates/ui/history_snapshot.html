@@ -1,0 +1,86 @@
+﻿<h1 class="section-title">&#x1F4C5; Детали снимка</h1>
+
+<div class="stat-cards">
+    <div class="stat-card neutral">
+        <div class="stat-label">&#x1F4C1; ID</div>
+        <div class="stat-value" style="font-size:1rem;font-family:monospace;">{{ .Snapshot.ID }}</div>
+    </div>
+    <div class="stat-card positive">
+        <div class="stat-label">&#127760; Доменов</div>
+        <div class="stat-value">{{ .Snapshot.TotalDomains }}</div>
+    </div>
+    <div class="stat-card warning">
+        <div class="stat-label">&#128203; Источников</div>
+        <div class="stat-value">{{ .Snapshot.TotalSources }}</div>
+    </div>
+    <div class="stat-card neutral">
+        <div class="stat-label">&#x1F4E6; Загружено</div>
+        <div class="stat-value">{{ .Snapshot.TotalFetched }}</div>
+    </div>
+    <div class="stat-card positive">
+        <div class="stat-label">&#x1F552; Время сборки</div>
+        <div class="stat-value" style="font-size:1.2rem;">{{ .Snapshot.BuildTime }}</div>
+    </div>
+    <div class="stat-card {{ if gt .Snapshot.BuildTimeMs 5000 }}negative{{ else }}positive{{ end }}">
+        <div class="stat-label">&#x23F1; Время (мс)</div>
+        <div class="stat-value">{{ .Snapshot.BuildTimeMs }}</div>
+    </div>
+</div>
+
+{{ if .Snapshot.Errors }}
+<div class="card" style="border-left:4px solid #dc3545;">
+    <h3>&#x274C; Ошибки</h3>
+    {{ range .Snapshot.Errors }}
+    <div style="color:#721c24;padding:0.5rem 0;border-bottom:1px solid #f8d7da;">&#x274C; {{ . }}</div>
+    {{ end }}
+</div>
+{{ end }}
+
+<div class="card">
+    <h3>&#128222; Домены ({{ len .Snapshot.Domains }})</h3>
+    <div class="search-bar">
+        <input type="text" id="domain-filter-input" placeholder="Фильтр доменов..." style="flex:1;">
+        <button class="button" onclick="filterDomains()">&#128269;</button>
+    </div>
+    {{ if .Snapshot.Domains }}
+    <div style="overflow-x:auto;max-height:500px;overflow-y:auto;">
+        <table class="data-table">
+            <tbody id="domains-list">
+                {{ range .Snapshot.Domains }}
+                <tr class="domain-row">
+                    <td><span class="domain-name">{{ . }}</span></td>
+                </tr>
+                {{ end }}
+            </tbody>
+        </table>
+    </div>
+    {{ else }}
+    <div class="empty-state">
+        <p>Нет доменов в этом снимке</p>
+    </div>
+    {{ end }}
+</div>
+
+<div style="margin-top:2rem;display:flex;gap:1rem;flex-wrap:wrap;">
+    <a href="/ui/history" class="button" style="text-decoration:none;">&#x2190; Назад к истории</a>
+    <a href="/ui/history/diff" class="button" style="text-decoration:none;">&#x1F504; Сравнить</a>
+    <a href="/ui/diagnostics" class="button" style="text-decoration:none;">&#128269; Диагностика</a>
+</div>
+
+<script>
+function filterDomains() {
+    const filter = document.getElementById('domain-filter-input').value.toLowerCase();
+    const rows = document.querySelectorAll('.domain-row');
+    rows.forEach(row => {
+        const name = row.querySelector('.domain-name');
+        if (name) {
+            const text = name.textContent.toLowerCase();
+            row.style.display = text.includes(filter) ? '' : 'none';
+        }
+    });
+}
+
+document.getElementById('domain-filter-input')?.addEventListener('input', () => {
+    filterDomains();
+});
+</script>

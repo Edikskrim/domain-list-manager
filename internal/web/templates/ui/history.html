@@ -1,0 +1,170 @@
+﻿<h1 class="section-title">&#128339; История сборок</h1>
+
+<div class="stat-cards">
+    <div class="stat-card neutral">
+        <div class="stat-label">&#128339; Всего снимков</div>
+        <div class="stat-value">{{ len .Snapshots }}</div>
+    </div>
+    <div class="stat-card positive">
+        <div class="stat-label">&#128176; Доменов в последнем</div>
+        <div class="stat-value">{{ if and .Snapshots (gt (len .Snapshots) 0) }}{{ (index .Snapshots 0).TotalDomains }}{{ else }}0{{ end }}</div>
+    </div>
+</div>
+
+<div class="card">
+    <h3>&#128339; Список снимков</h3>
+    {{ if .Snapshots }}
+    <div style="overflow-x:auto;max-height:600px;overflow-y:auto;">
+        <table class="data-table" id="history-table">
+            <thead>
+                <tr>
+                    <th class="sortable" data-field="created_at">&#x1F4C1; ID</th>
+                    <th class="sortable" data-field="build_time">&#128197; Время сборки</th>
+                    <th>&#127760; Доменов</th>
+                    <th>&#128203; Источников</th>
+                    <th>&#x1F4E6; Загружено</th>
+                    <th>&#x1F552; Создан</th>
+                    <th>&#x1F527; Действия</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{ range .Snapshots }}
+                <tr data-snapshot-id="{{ .ID }}">
+                    <td><strong style="font-family:monospace;font-size:0.85rem;">{{ .ID }}</strong></td>
+                    <td>{{ .BuildTime }}</td>
+                    <td>
+                        <span class="badge badge-info">{{ .TotalDomains }}</span>
+                        {{ if gt .TotalDomains 0 }}
+                        <button class="button button-small button-secondary" onclick="viewDomains('{{ .ID }}')" title="Просмотр доменов" style="margin-left:0.25rem;">&#128065;</button>
+                        {{ end }}
+                    </td>
+                    <td>{{ .TotalSources }}</td>
+                    <td>{{ .TotalFetched }}</td>
+                    <td class="timestamp">{{ .CreatedAt }}</td>
+                    <td class="actions">
+                        <button class="button button-small button-secondary" onclick="viewSnapshot('{{ .ID }}')" title="Детали">&#128065;</button>
+                        <button class="button button-small button-warning" onclick="openCompareModal('{{ .ID }}')" title="Сравнить">&#x1F504;</button>
+                        <button class="button button-small button-danger" onclick="deleteSnapshot('{{ .ID }}')" title="Удалить">&#128465;</button>
+                    </td>
+                </tr>
+                {{ end }}
+            </tbody>
+        </table>
+    </div>
+    <div style="margin-top:1rem;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
+        <span class="text-sm" style="color:#666;">Показано: {{ len .Snapshots }} снимков</span>
+        <div style="display:flex;gap:0.25rem;">
+            <button class="button button-small button-secondary" disabled>&#x25C0; Назад</button>
+            <button class="button button-small" disabled>1</button>
+            <button class="button button-small button-secondary" disabled>Далее &#x25B6;</button>
+        </div>
+    </div>
+    {{ else }}
+    <div class="empty-state">
+        <div class="icon">&#128339;</div>
+        <p>Нет снимков в истории</p>
+        <p>Запустите сборку для создания первого снимка</p>
+        <a href="/ui/build" class="button" style="text-decoration:none;">&#x1F3A8; Построить список</a>
+    </div>
+    {{ end }}
+</div>
+
+<div style="margin-top:2rem;display:flex;gap:1rem;flex-wrap:wrap;">
+    <a href="/ui/domains" class="button" style="text-decoration:none;">&#127760; Домены</a>
+    <a href="/ui/sources" class="button" style="text-decoration:none;">&#128203; Источники</a>
+    <a href="/ui/diagnostics" class="button" style="text-decoration:none;">&#128269; Диагностика</a>
+</div>
+
+<!-- Compare Modal -->
+<div id="compare-modal" data-modal="overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;">
+    <div style="background:#fff;padding:2rem;border-radius:0.5rem;max-width:500px;width:90%;">
+        <h3>&#x1F504; Сравнить снимки</h3>
+        <p>Выберите второй снимок для сравнения:</p>
+        <select id="compare-snapshot-select" style="width:100%;padding:0.5rem;margin:1rem 0;">
+            <option value="">-- Выберите снимок --</option>
+        </select>
+        <button class="button" onclick="showDiff()">Показать различия</button>
+        <button class="button button-secondary" data-close-modal>Закрыть</button>
+    </div>
+</div>
+
+<script>
+function viewSnapshot(id) {
+    window.location.href = `/ui/history/${id}`;
+}
+
+function viewDomains(id) {
+    fetch(`/api/v1/history/${id}`)
+        .then(r => r.json())
+        .then(data => {
+            const snap = data.data || data;
+            const domains = snap.domains || [];
+            const modal = document.createElement('div');
+            modal.setAttribute('data-modal', 'overlay');
+            modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:1000;';
+            modal.innerHTML = `
+                <div style="background:#fff;padding:2rem;border-radius:0.5rem;max-width:800px;width:90%;max-height:80vh;overflow-y:auto;">
+                    <h3>&#128222; Домены снимка (${domains.length})</h3>
+                    <pre style="background:#f5f5f5;padding:1rem;border-radius:0.25rem;overflow-x:auto;max-height:400px;font-size:0.85rem;">${domains.map(d => '  ' + d).join('\n') || 'Нет доменов'}</pre>
+                    <button class="button button-secondary" data-close-modal style="margin-top:1rem;">Закрыть</button>
+                </div>
+            `;
+            modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+            document.body.appendChild(modal);
+        })
+        .catch(() => alert('Ошибка загрузки доменов'));
+}
+
+function openCompareModal(snapshot1Id) {
+    const modal = document.getElementById('compare-modal');
+    modal.style.display = 'flex';
+    window.currentSnapshot1 = snapshot1Id;
+    
+    fetch('/api/v1/history')
+        .then(r => r.json())
+        .then(data => {
+            const snap = data.data || data;
+            const snapshots = snap.snapshots || [];
+            const select = document.getElementById('compare-snapshot-select');
+            select.innerHTML = '<option value="">-- Выберите снимок --</option>';
+            snapshots.forEach(s => {
+                if (s.id !== snapshot1Id) {
+                    const opt = document.createElement('option');
+                    opt.value = s.id;
+                    opt.textContent = `${s.id} — ${s.total_domains || s.TotalDomains || 0} доменов`;
+                    select.appendChild(opt);
+                }
+            });
+        })
+        .catch(() => {});
+}
+
+function closeCompareModal() {
+    document.getElementById('compare-modal').style.display = 'none';
+}
+
+function showDiff() {
+    const snapshot2 = document.getElementById('compare-snapshot-select').value;
+    if (!snapshot2) { alert('Выберите второй снимок'); return; }
+    window.location.href = `/ui/history/diff?s1=${window.currentSnapshot1}&s2=${snapshot2}`;
+}
+
+function deleteSnapshot(id) {
+    if (!confirm(`Удалить снимок ${id}?`)) return;
+    fetch(`/api/v1/history/${id}`, { method: 'DELETE' })
+        .then(r => { if (r.ok) window.location.reload(); else alert('Ошибка удаления'); })
+        .catch(() => alert('Ошибка при удалении'));
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.sortable').forEach(th => {
+        th.addEventListener('click', () => {
+            const field = th.dataset.field;
+            const params = new URLSearchParams(window.location.search);
+            params.set('sort', field);
+            params.set('dir', params.get('dir') === 'asc' ? 'desc' : 'asc');
+            window.location.search = params.toString();
+        });
+    });
+});
+</script>
