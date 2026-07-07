@@ -1,0 +1,83 @@
+﻿<h1 class="section-title">&#9881; Настройки</h1>
+
+<div class="card">
+    <h3>Системные настройки</h3>
+    {{ if .Settings }}
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Ключ</th>
+                <th>Значение</th>
+                <th>Действия</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{ range .Settings }}
+            <tr>
+                <td><code>{{ .Key }}</code></td>
+                <td><code>{{ .Value }}</code></td>
+                <td class="actions">
+                    <button class="button button-small button-secondary" onclick="editSetting('{{ .Key }}', '{{ .String }}')">&#9998; Изменить</button>
+                </td>
+            </tr>
+            {{ end }}
+        </tbody>
+    </table>
+    {{ else }}
+    <div class="empty-state">
+        <div class="icon">&#9881;</div>
+        <p>Настройки не найдены</p>
+    </div>
+    {{ end }}
+</div>
+
+<div class="card">
+    <h3>Параметры приложения</h3>
+    <table class="data-table">
+        <tr>
+            <th>Параметр</th>
+            <th>Значение</th>
+        </tr>
+        <tr>
+            <td>Путь к базе данных</td>
+            <td><code>data/app.db</code></td>
+        </tr>
+        <tr>
+            <td>Путь к выходному файлу</td>
+            <td><code>data/output.txt</code></td>
+        </tr>
+        <tr>
+            <td>Таймаут запросов</td>
+            <td><code>30s</code></td>
+        </tr>
+        <tr>
+            <td>Максимум повторных попыток</td>
+            <td><code>3</code></td>
+        </tr>
+        <tr>
+            <td>Интервал обновления</td>
+            <td><code>15m</code></td>
+        </tr>
+        <tr>
+            <td>Количество снимков</td>
+            <td><code>10</code></td>
+        </tr>
+    </table>
+</div>
+
+<a href="/ui/" class="button" style="text-decoration:none;">&#8592; Назад</a>
+
+<script>
+function editSetting(key, currentValue) {
+    const newValue = prompt('Новое значение для ' + key + ':', currentValue);
+    if (newValue === null || newValue === currentValue) return;
+    
+    fetch('/api/v1/settings/' + key, {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({value: newValue})
+    })
+    .then(r => { if (r.ok) window.location.reload(); else alert('Ошибка сохранения'); })
+    .catch(err => alert('Ошибка: ' + err.message));
+}
+</script>

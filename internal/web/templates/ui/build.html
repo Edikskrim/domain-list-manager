@@ -1,0 +1,137 @@
+﻿<h1 class="section-title">&#129504; Сборка списка</h1>
+
+{{ if .BuildStatus }}
+<div class="stat-cards">
+    <div class="stat-card positive">
+        <div class="stat-label">&#128176; Доменов</div>
+        <div class="stat-value">{{ .BuildStatus.TotalDomains }}</div>
+    </div>
+    <div class="stat-card neutral">
+        <div class="stat-label">&#128203; Источников</div>
+        <div class="stat-value">{{ .BuildStatus.TotalSources }}</div>
+    </div>
+    <div class="stat-card neutral">
+        <div class="stat-label">&#x1F4E6; Загружено</div>
+        <div class="stat-value">{{ .BuildStatus.TotalFetched }}</div>
+    </div>
+    <div class="stat-card warning">
+        <div class="stat-label">&#x23F1; Время (мс)</div>
+        <div class="stat-value">{{ .BuildStatus.BuildTimeMs }}</div>
+    </div>
+    <div class="stat-card positive">
+        <div class="stat-label">&#x1F4C5; Последняя сборка</div>
+        <div class="stat-value" style="font-size:1rem;">{{ .BuildStatus.LastBuildTime }}</div>
+    </div>
+    <div class="stat-card {{ if .BuildStatus.HasOutput }}positive{{ else }}warning{{ end }}">
+        <div class="stat-label">&#x1F4BE; Output</div>
+        <div class="stat-value" style="font-size:1rem;">{{ if .BuildStatus.HasOutput }}&#x2705; Есть{{ else }}&#x274C; Нет{{ end }}</div>
+    </div>
+</div>
+
+<div class="card">
+    <h3>&#x1F527; Управление сборкой</h3>
+    <div style="display:flex;gap:1rem;flex-wrap:wrap;">
+        <button class="button button-success" onclick="startBuild()">&#x1F3A8; Запустить сборку</button>
+        <button class="button" onclick="writeOutput()">&#x1F4BE; Записать файл</button>
+        <button class="button" onclick="refreshStatus()">&#x1F504; Обновить статус</button>
+        {{ if .BuildStatus.HasDomains }}
+        <a href="/api/v1/domains/export-txt" class="button" download>&#x1F4E4; Экспорт TXT</a>
+        {{ end }}
+    </div>
+    {{ if .BuildStatus.DownloadURL }}
+    <div style="margin-top:1rem;padding:0.75rem;background:#d4edda;border-radius:0.25rem;">
+        <div style="font-weight:600;margin-bottom:0.5rem;">&#x1F4C1; URL для загрузки (для OpenWrt):</div>
+        <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;">
+            <input type="text" id="download-url" value="{{ .BuildStatus.DownloadURL }}" readonly style="flex:1;min-width:300px;padding:0.4rem 0.6rem;border:1px solid #ccc;border-radius:0.25rem;font-family:monospace;font-size:0.85rem;background:#fff;">
+            <button class="button button-small" onclick="copyURL()">&#x1F4CB; Копировать</button>
+            <a href="{{ .BuildStatus.DownloadURL }}" target="_blank" class="button button-small button-success">&#x1F4E4; Скачать</a>
+        </div>
+        {{ if .BuildStatus.HasOutput }}
+        <div style="margin-top:0.5rem;font-size:0.8rem;color:#666;">{{ .BuildStatus.OutputPath }} ({{ .BuildStatus.TotalDomains }} доменов)</div>
+        {{ else }}
+        <div style="margin-top:0.5rem;font-size:0.8rem;color:#856404;">&#9888; Нажмите "Записать файл" для сохранения файла</div>
+        {{ end }}
+    </div>
+    {{ end }}
+</div>
+{{ else }}
+<div class="empty-state">
+    <div class="icon">&#129504;</div>
+    <p>Не удалось загрузить статус сборки</p>
+    <button class="button" onclick="window.location.reload()">&#x1F504; Повторить</button>
+</div>
+{{ end }}
+
+<div style="margin-top:2rem;display:flex;gap:1rem;flex-wrap:wrap;">
+    <a href="/ui/domains" class="button" style="text-decoration:none;">&#127760; Домены</a>
+    <a href="/ui/sources" class="button" style="text-decoration:none;">&#128203; Источники</a>
+    <a href="/ui/history" class="button" style="text-decoration:none;">&#128339; История</a>
+</div>
+
+<script>
+function startBuild() {
+    if (!confirm('Запустить сборку списка?')) return;
+    
+    const btn = event.target;
+    btn.disabled = true;
+    btn.textContent = 'Сборка...';
+    
+    fetch('/api/v1/build', { method: 'POST' })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                alert('Сборка завершена успешно!');
+                window.location.reload();
+            } else {
+                alert('Ошибка сборки: ' + (data.error || 'Неизвестная ошибка'));
+                btn.disabled = false;
+                btn.textContent = '&#x1F3A8; Запустить сборку';
+            }
+        })
+        .catch(err => {
+            alert('Ошибка: ' + err.message);
+            btn.disabled = false;
+            btn.textContent = '&#x1F3A8; Запустить сборку';
+        });
+}
+
+function writeOutput() {
+    if (!confirm('Собрать список и записать в файл?')) return;
+    
+    const btn = event.target;
+    btn.disabled = true;
+    btn.textContent = 'Запись...';
+    
+    fetch('/api/v1/build/write', { method: 'POST' })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                alert('Файл записан: ' + (data.data?.output_path || 'output/domains.lst'));
+                window.location.reload();
+            } else {
+                alert('Ошибка: ' + (data.error || 'Неизвестная ошибка'));
+                btn.disabled = false;
+                btn.textContent = '&#x1F4BE; Записать файл';
+            }
+        })
+        .catch(err => {
+            alert('Ошибка: ' + err.message);
+            btn.disabled = false;
+            btn.textContent = '&#x1F4BE; Записать файл';
+        });
+}
+
+function copyURL() {
+    const input = document.getElementById('download-url');
+    input.select();
+    document.execCommand('copy');
+    alert('Ссылка скопирована: ' + input.value);
+}
+
+function refreshStatus() {
+    fetch('/api/v1/build/status')
+        .then(r => r.json())
+        .then(() => { window.location.reload(); })
+        .catch(() => alert('Ошибка обновления статуса'));
+}
+</script>

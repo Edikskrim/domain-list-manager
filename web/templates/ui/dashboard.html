@@ -1,0 +1,143 @@
+﻿<h1 class="section-title">&#128200; Дашборд</h1>
+
+<div data-autofresh="true"></div>
+
+<div class="stat-cards">
+    <div class="stat-card neutral">
+        <div class="stat-label">&#128222; Всего доменов</div>
+        <div class="stat-value">{{ .Dashboard.TotalDomains }}</div>
+        <div class="stat-sub">в базе данных</div>
+    </div>
+    <div class="stat-card positive">
+        <div class="stat-label">&#128203; Источников</div>
+        <div class="stat-value">{{ .Dashboard.EnabledSources }}</div>
+        <div class="stat-sub">из {{ .Dashboard.TotalSources }} всего</div>
+    </div>
+    <div class="stat-card warning">
+        <div class="stat-label">&#9888; Отключено</div>
+        <div class="stat-value">{{ .Dashboard.DisabledSources }}</div>
+        <div class="stat-sub">неактивных источников</div>
+    </div>
+    <div class="stat-card positive">
+        <div class="stat-label">&#x1F4BE; Последняя сборка</div>
+        <div class="stat-value" style="font-size:1.2rem;">
+            {{ if .Dashboard.LastBuild }}
+                {{ .Dashboard.LastBuild.TotalDomains }} доменов
+            {{ else }}
+                Н/Д
+            {{ end }}
+        </div>
+        <div class="stat-sub">
+            {{ if .Dashboard.LastBuild }}
+                {{ .Dashboard.LastBuild.CreatedAt }}
+            {{ else }}
+                не выполнялась
+            {{ end }}
+        </div>
+    </div>
+    <div class="stat-card neutral">
+        <div class="stat-label">&#128339; Снимков</div>
+        <div class="stat-value">{{ .Dashboard.StorageUsage.SnapshotCount }}</div>
+        <div class="stat-sub">история сборок</div>
+    </div>
+</div>
+
+<div class="card">
+    <h3>&#128203; Статус источников</h3>
+    {{ if .Dashboard.SourceStatus }}
+    <div style="overflow-x:auto;max-height:400px;overflow-y:auto;">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Название</th>
+                    <th>Статус</th>
+                    <th>Доменов</th>
+                    <th>Последнее обновление</th>
+                    <th>Ошибки</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{ range .Dashboard.SourceStatus }}
+                <tr>
+                    <td><strong>{{ .Name }}</strong></td>
+                    <td>
+                        {{ if .Enabled }}
+                        <span class="badge badge-success">Активен</span>
+                        {{ else }}
+                        <span class="badge badge-secondary">Отключен</span>
+                        {{ end }}
+                    </td>
+                    <td>{{ .DomainCount }}</td>
+                    <td>{{ if .LastUpdate }}{{ .LastUpdate }}{{ else }}—{{ end }}</td>
+                    <td>
+                        {{ if .LastError }}
+                        <span class="badge badge-danger" style="cursor:pointer;" title="{{ .LastError }}">! Ошибка</span>
+                        {{ else }}
+                        <span class="badge badge-success">OK</span>
+                        {{ end }}
+                    </td>
+                </tr>
+                {{ end }}
+            </tbody>
+        </table>
+    </div>
+    {{ else }}
+    <div class="empty-state">
+        <div class="icon">&#128203;</div>
+        <p>Нет настроенных источников</p>
+    </div>
+    {{ end }}
+</div>
+
+{{ if .Dashboard.BuildStats.TotalBuilds }}
+<div class="card">
+    <h3>&#128202; Статистика сборок</h3>
+    <div class="stat-cards" style="margin-bottom:0;">
+        <div class="stat-card neutral">
+            <div class="stat-label">Всего сборок</div>
+            <div class="stat-value" style="font-size:1.4rem;">{{ .Dashboard.BuildStats.TotalBuilds }}</div>
+        </div>
+        <div class="stat-card positive">
+            <div class="stat-label">Среднее кол-во доменов</div>
+            <div class="stat-value" style="font-size:1.4rem;">{{ .Dashboard.BuildStats.AvgDomains }}</div>
+        </div>
+        <div class="stat-card warning">
+            <div class="stat-label">Среднее время сборки</div>
+            <div class="stat-value" style="font-size:1.4rem;">{{ .Dashboard.BuildStats.AvgBuildTimeMs }}ms</div>
+        </div>
+        <div class="stat-card neutral">
+            <div class="stat-label">Первая сборка</div>
+            <div class="stat-value" style="font-size:1.2rem;">{{ if .Dashboard.BuildStats.FirstBuildDate }}{{ .Dashboard.BuildStats.FirstBuildDate }}{{ else }}—{{ end }}</div>
+        </div>
+    </div>
+</div>
+{{ end }}
+
+{{ if .Dashboard.RecentErrors }}
+<div class="card" style="border-left:4px solid #dc3545;">
+    <h3>&#9888; Последние ошибки</h3>
+    {{ range .Dashboard.RecentErrors }}
+    <div style="color:#721c24;padding:0.5rem 0;border-bottom:1px solid #f8d7da;">&#x274C; {{ . }}</div>
+    {{ end }}
+</div>
+{{ end }}
+
+<div class="card">
+    <h3>&#128190; Хранилище</h3>
+    <div class="stat-cards" style="margin-bottom:0;">
+        <div class="stat-card neutral">
+            <div class="stat-label">Снимков</div>
+            <div class="stat-value" style="font-size:1.4rem;">{{ .Dashboard.StorageUsage.SnapshotCount }}</div>
+        </div>
+        <div class="stat-card positive">
+            <div class="stat-label">Доменов в снимках</div>
+            <div class="stat-value" style="font-size:1.4rem;">{{ .Dashboard.StorageUsage.TotalDomainsCount }}</div>
+        </div>
+    </div>
+</div>
+
+<div style="margin-top:2rem;display:flex;gap:1rem;flex-wrap:wrap;">
+    <a href="/ui/sources" class="button" style="text-decoration:none;">&#128203; Управлять источниками</a>
+    <a href="/ui/history" class="button" style="text-decoration:none;">&#128339; История сборок</a>
+    <a href="/ui/diagnostics" class="button" style="text-decoration:none;">&#128269; Диагностика</a>
+</div>

@@ -1,0 +1,80 @@
+﻿<h1 class="section-title">&#x1F552; Планировщик</h1>
+
+{{ if .Status }}
+<div class="stat-cards">
+    <div class="stat-card {{ if .Status.Running }}positive{{ else }}warning{{ end }}">
+        <div class="stat-label">&#128337; Статус</div>
+        <div class="stat-value" style="font-size:1.2rem;">
+            {{ if .Status.Running }}&#x2705; Работает
+            {{ else }}&#x274C; Остановлен
+            {{ end }}
+        </div>
+    </div>
+    <div class="stat-card neutral">
+        <div class="stat-label">&#x1F4C5; Последнее обновление</div>
+        <div class="stat-value" style="font-size:1rem;">{{ if .Status.LastUpdate }}{{ .Status.LastUpdate }}{{ else }}—{{ end }}</div>
+    </div>
+    <div class="stat-card neutral">
+        <div class="stat-label">&#x1F4C5; Следующее обновление</div>
+        <div class="stat-value" style="font-size:1rem;">{{ if .Status.NextUpdate }}{{ .Status.NextUpdate }}{{ else }}—{{ end }}</div>
+    </div>
+    <div class="stat-card warning">
+        <div class="stat-label">&#x23F1; Интервал</div>
+        <div class="stat-value">{{ if .Status.UpdateTime }}{{ .Status.UpdateTime }}ms{{ else }}—{{ end }}</div>
+    </div>
+    <div class="stat-card positive">
+        <div class="stat-label">&#x1F4C8; Кол-во обновлений</div>
+        <div class="stat-value">{{ if .Status.UpdateCount }}{{ .Status.UpdateCount }}{{ else }}0{{ end }}</div>
+    </div>
+    <div class="stat-card negative">
+        <div class="stat-label">&#x1F6A8; Ошибки</div>
+        <div class="stat-value">{{ if .Status.ErrorCount }}{{ .Status.ErrorCount }}{{ else }}0{{ end }}</div>
+    </div>
+</div>
+
+<div class="card">
+    <h3>&#x1F527; Управление</h3>
+    <div style="display:flex;gap:1rem;flex-wrap:wrap;">
+        {{ if not .Status.Running }}
+        <button class="button button-success" onclick="startScheduler()">&#x25B6; Запустить</button>
+        {{ else }}
+        <button class="button button-warning" onclick="stopScheduler()">&#x23F8; Остановить</button>
+        {{ end }}
+        <button class="button" onclick="triggerUpdate()">&#x1F504; Обновить сейчас</button>
+        <button class="button button-secondary" onclick="window.location.reload()">&#x1F504; Обновить статус</button>
+    </div>
+</div>
+{{ else }}
+<div class="empty-state">
+    <div class="icon">&#x1F552;</div>
+    <p>Не удалось загрузить статус планировщика</p>
+    <button class="button" onclick="window.location.reload()">&#x1F504; Повторить</button>
+</div>
+{{ end }}
+
+<div style="margin-top:2rem;display:flex;gap:1rem;flex-wrap:wrap;">
+    <a href="/ui/domains" class="button" style="text-decoration:none;">&#127760; Домены</a>
+    <a href="/ui/sources" class="button" style="text-decoration:none;">&#128203; Источники</a>
+    <a href="/ui/build" class="button" style="text-decoration:none;">&#129504; Сборка</a>
+</div>
+
+<script>
+function startScheduler() {
+    fetch('/api/v1/scheduler/start', { method: 'POST' })
+        .then(r => { if (r.ok) window.location.reload(); else alert('Ошибка запуска'); })
+        .catch(() => alert('Ошибка при запуске'));
+}
+
+function stopScheduler() {
+    if (!confirm('Остановить планировщик?')) return;
+    fetch('/api/v1/scheduler/stop', { method: 'POST' })
+        .then(r => { if (r.ok) window.location.reload(); else alert('Ошибка остановки'); })
+        .catch(() => alert('Ошибка при остановке'));
+}
+
+function triggerUpdate() {
+    fetch('/api/v1/scheduler/trigger', { method: 'POST' })
+        .then(() => { alert('Запущено обновление'); })
+        .catch(() => alert('Ошибка при запуске'));
+}
+</script>

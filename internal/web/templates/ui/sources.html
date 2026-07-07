@@ -1,0 +1,282 @@
+﻿<h1 class="section-title">&#128203; Источники</h1>
+
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:0.5rem;">
+    <div class="search-bar" style="flex:1;margin:0;">
+        <input type="text" id="source-search" placeholder="Поиск источника..." value="{{ .Search }}" style="flex:1;">
+        <select id="source-status-filter" style="min-width:120px;">
+            <option value="">Все статусы</option>
+            <option value="enabled">Активные</option>
+            <option value="disabled">Отключенные</option>
+        </select>
+        <button class="button" onclick="applyFilters()">Найти</button>
+    </div>
+    <button class="button button-success" onclick="showAddSourceModal()">&#10133; Добавить источник</button>
+</div>
+
+<div class="stat-cards">
+    <div class="stat-card neutral">
+        <div class="stat-label">&#128203; Всего</div>
+        <div class="stat-value">{{ len .Sources }}</div>
+    </div>
+    <div class="stat-card positive">
+        <div class="stat-label">&#x2705; Активных</div>
+        <div class="stat-value">{{ .Enabled }}</div>
+    </div>
+    <div class="stat-card warning">
+        <div class="stat-label">&#x274C; Отключенных</div>
+        <div class="stat-value">{{ .Disabled }}</div>
+    </div>
+</div>
+
+<div class="card">
+    <h3>&#128203; Список источников</h3>
+    {{ if .Sources }}
+    <div style="overflow-x:auto;max-height:600px;overflow-y:auto;">
+        <table class="data-table" id="sources-table">
+            <thead>
+                <tr>
+                    <th class="sortable" data-field="name" data-dir="{{ .Dir }}" data-active="{{ if eq .Sort "name" }}true{{ else }}false{{ end }}">
+                        &#128196; Название
+                        {{ if eq .Sort "name" }}{{ if eq .Dir "asc" }}&#x25B2;{{ else }}&#x25BC;{{ end }}{{ end }}
+                    </th>
+                    <th>&#128203; Парсер</th>
+                    <th>&#127760; Доменов</th>
+                    <th>&#128197; Статус</th>
+                    <th>&#x1F552; Последнее обновление</th>
+                    <th>&#x1F6A8; Ошибки</th>
+                    <th>&#x1F527; Действия</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{ range .Sources }}
+                <tr data-source-id="{{ .ID }}">
+                    <td>
+                        <strong>{{ .Name }}</strong>
+                        {{ if .Description }}
+                        <br><small style="color:#666;">{{ .Description }}</small>
+                        {{ end }}
+                    </td>
+                    <td><span class="badge badge-info">{{ .ParserType }}</span></td>
+                    <td>{{ .DomainCount }}</td>
+                    <td>
+                        {{ if .Enabled }}
+                        <span class="badge badge-success">&#x2705; Активнен</span>
+                        {{ else }}
+                        <span class="badge badge-secondary">&#x274C; Отключен</span>
+                        {{ end }}
+                    </td>
+                    <td class="timestamp">{{ if .LastUpdate }}{{ .LastUpdate }}{{ else }}—{{ end }}</td>
+                    <td>
+                        {{ if .LastError }}
+                        <span class="badge badge-danger" title="{{ .LastError }}">Ошибка</span>
+                        {{ else }}
+                        <span class="badge badge-success">OK</span>
+                        {{ end }}
+                    </td>
+                    <td class="actions">
+                        <button class="button button-small button-secondary" onclick="viewSource('{{ .ID }}')" title="Просмотр">&#128065;</button>
+                        <button class="button button-small button-info" onclick="editSource('{{ .ID }}')" title="Редактировать">&#9998;</button>
+                        <button class="button button-small button-warning" onclick="toggleSource('{{ .ID }}', !{{ .Enabled }})" title="{{ if .Enabled }}Отключить{{ else }}Включить{{ end }}">{{ if .Enabled }}&#x274C;{{ else }}&#x2705;{{ end }}</button>
+                        <button class="button button-small button-danger" onclick="deleteSource('{{ .ID }}', '{{ .Name }}')" title="Удалить">&#128465;</button>
+                    </td>
+                </tr>
+                {{ end }}
+            </tbody>
+        </table>
+    </div>
+    {{ else }}
+    <div class="empty-state">
+        <div class="icon">&#128203;</div>
+        <p>Нет настроенных источников</p>
+        <a href="/ui/login" class="button" style="text-decoration:none;">&#128279; Через API</a>
+    </div>
+    {{ end }}
+</div>
+
+<div style="margin-top:2rem;display:flex;gap:1rem;flex-wrap:wrap;">
+    <a href="/ui/domains" class="button" style="text-decoration:none;">&#127760; Домены</a>
+    <a href="/ui/history" class="button" style="text-decoration:none;">&#128339; История</a>
+    <a href="/ui/diagnostics" class="button" style="text-decoration:none;">&#128269; Диагностика</a>
+    <a href="/ui/scheduler" class="button" style="text-decoration:none;">&#x1F552; Планировщик</a>
+</div>
+
+<script>
+function applyFilters() {
+    const search = document.getElementById('source-search').value;
+    const status = document.getElementById('source-status-filter').value;
+    const params = new URLSearchParams(window.location.search);
+    if (search) params.set('search', search);
+    else params.delete('search');
+    if (status) params.set('status', status);
+    else params.delete('status');
+    window.location.search = params.toString();
+}
+
+function viewSource(id) {
+    fetch(`/api/v1/sources/${id}`, { credentials: 'include' })
+        .then(r => r.json())
+        .then(data => showSourceModal(data))
+        .catch(err => alert('Ошибка: ' + err.message));
+}
+
+function showSourceModal(data) {
+    const s = data.data || data;
+    const modal = document.createElement('div');
+    modal.setAttribute('data-modal', 'overlay');
+    modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:1000;';
+    modal.innerHTML = `
+        <div style="background:#fff;padding:2rem;border-radius:0.5rem;max-width:700px;width:90%;max-height:80vh;overflow-y:auto;">
+            <h3>&#128203; Источник</h3>
+            <dl>
+                <dt>ID</dt><dd style="font-family:monospace;">${s.id || 'N/A'}</dd>
+                <dt>Name</dt><dd><strong>${s.name || s.Name || 'N/A'}</strong></dd>
+                <dt>URL</dt><dd><a href="${s.url || 'N/A'}" target="_blank">${s.url || 'N/A'}</a></dd>
+                <dt>Parser Type</dt><dd>${s.parser_type || s.parserType || 'N/A'}</dd>
+                <dt>Enabled</dt><dd>${s.enabled ? 'Да' : 'Нет'}</dd>
+                <dt>Domain Count</dt><dd>${s.domain_count || s.domainCount || 0}</dd>
+                <dt>Update Interval</dt><dd>${s.update_interval || s.updateInterval || 'N/A'}s</dd>
+                <dt>Description</dt><dd>${s.description || '—'}</dd>
+                <dt>Last Update</dt><dd>${s.last_update || '—'}</dd>
+                <dt>Last Error</dt><dd style="color:#721c24;">${s.last_error || '—'}</dd>
+                <dt>Created</dt><dd>${s.created_at || 'N/A'}</dd>
+                <dt>Updated</dt><dd>${s.updated_at || 'N/A'}</dd>
+            </dl>
+            <button class="button button-secondary" data-close-modal style="margin-top:1rem;">Закрыть</button>
+        </div>
+    `;
+    modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+    document.body.appendChild(modal);
+}
+
+function toggleSource(id, enable) {
+    const action = enable ? 'enable' : 'disable';
+    const label = enable ? 'включить' : 'отключить';
+    if (!confirm(`Вы уверены, что хотите ${label} этот источник?`)) return;
+    
+    fetch(`/api/v1/sources/${id}/${action}`, { method: 'POST', credentials: 'include' })
+        .then(r => { if (r.ok) window.location.reload(); else alert('Ошибка ' + action); })
+        .catch(err => alert('Ошибка: ' + err.message));
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.sortable').forEach(th => {
+        th.addEventListener('click', () => {
+            const field = th.dataset.field;
+            const currentDir = th.dataset.dir || 'asc';
+            const params = new URLSearchParams(window.location.search);
+            params.set('sort', field);
+            params.set('dir', currentDir === 'asc' ? 'desc' : 'asc');
+            window.location.search = params.toString();
+        });
+    });
+});
+
+let currentEditSourceId = null;
+
+function showAddSourceModal() {
+    currentEditSourceId = null;
+    loadSourceForModal(null);
+}
+
+function editSource(id) {
+    fetch(`/api/v1/sources/${id}`, { credentials: 'include' })
+        .then(r => r.json())
+        .then(data => loadSourceForModal(data))
+        .catch(err => alert('Ошибка: ' + err.message));
+}
+
+function loadSourceForModal(data) {
+    const modal = createSourceModal(data ? data.data || data : null);
+    document.getElementById('source-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const form = document.getElementById('source-form');
+        const payload = {
+            name: document.getElementById('source-name').value.trim(),
+            url: document.getElementById('source-url').value.trim(),
+            parser_type: document.getElementById('source-parser').value,
+            enabled: document.getElementById('source-enabled').checked,
+            description: document.getElementById('source-desc').value.trim(),
+            update_interval: parseInt(document.getElementById('source-interval').value) || 3600
+        };
+        const url = currentEditSourceId ? `/api/v1/sources/${currentEditSourceId}` : '/api/v1/sources';
+        const method = currentEditSourceId ? 'PUT' : 'POST';
+        fetch(url, {
+            method,
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload),
+            credentials: 'include'
+        })
+        .then(r => r.json())
+        .then(res => {
+            if (res.success) {
+                window.location.reload();
+            } else {
+                alert('Ошибка: ' + (res.message || 'Не удалось сохранить'));
+            }
+        })
+        .catch(err => alert('Ошибка: ' + err.message));
+    });
+}
+
+function deleteSource(id, name) {
+    if (!confirm(`Вы уверены, что хотите удалить источник "${name}"?`)) return;
+    fetch(`/api/v1/sources/${id}`, { method: 'DELETE', credentials: 'include' })
+        .then(r => { if (r.ok) window.location.reload(); else alert('Ошибка удаления'); })
+        .catch(err => alert('Ошибка: ' + err.message));
+}
+
+function createSourceModal(sourceData) {
+    const isEdit = !!sourceData;
+    const title = isEdit ? '&#9998; Редактировать источник' : '&#10133; Добавить источник';
+    const submitLabel = isEdit ? '&#128293; Сохранить' : '&#10133; Добавить';
+    const modal = document.createElement('div');
+    modal.setAttribute('data-modal', 'overlay');
+    modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:1000;';
+    modal.innerHTML = `
+        <div style="background:#fff;padding:2rem;border-radius:0.5rem;max-width:600px;width:90%;max-height:80vh;overflow-y:auto;">
+            <h3>${title}</h3>
+            <form id="source-form" style="display:flex;flex-direction:column;gap:1rem;">
+                <div>
+                    <label>Название *</label>
+                    <input type="text" id="source-name" placeholder="Мой источник" value="${sourceData?.name || sourceData?.Name || ''}" required style="width:100%;padding:0.5rem;border:1px solid #ddd;border-radius:4px;">
+                </div>
+                <div>
+                    <label>URL *</label>
+                    <input type="url" id="source-url" placeholder="https://example.com/domains.txt" value="${sourceData?.url || sourceData?.URL || ''}" required style="width:100%;padding:0.5rem;border:1px solid #ddd;border-radius:4px;">
+                </div>
+                <div>
+                    <label>Тип парсера</label>
+                    <select id="source-parser" style="width:100%;padding:0.5rem;border:1px solid #ddd;border-radius:4px;">
+                        <option value="raw" ${sourceData?.parser_type === 'raw' || sourceData?.parserType === 'raw' ? 'selected' : ''}>Raw (список доменов)</option>
+                        <option value="txt" ${sourceData?.parser_type === 'txt' || sourceData?.parserType === 'txt' ? 'selected' : ''}>TXT (список доменов)</option>
+                        <option value="hosts" ${sourceData?.parser_type === 'hosts' || sourceData?.parserType === 'hosts' ? 'selected' : ''}>Hosts файл</option>
+                        <option value="dnsmasq" ${sourceData?.parser_type === 'dnsmasq' || sourceData?.parserType === 'dnsmasq' ? 'selected' : ''}>Dnsmasq</option>
+                        <option value="regex" ${sourceData?.parser_type === 'regex' || sourceData?.parserType === 'regex' ? 'selected' : ''}>Regex</option>
+                        <option value="auto" ${sourceData?.parser_type === 'auto' || sourceData?.parserType === 'auto' ? 'selected' : ''}>Автоопределение</option>
+                        <option value="json" ${sourceData?.parser_type === 'json' || sourceData?.parserType === 'json' ? 'selected' : ''}>JSON</option>
+                        <option value="url-filter" ${sourceData?.parser_type === 'url-filter' || sourceData?.parserType === 'url-filter' ? 'selected' : ''}>URL Filter</option>
+                    </select>
+                </div>
+                <div>
+                    <label>Интервал обновления (сек)</label>
+                    <input type="number" id="source-interval" value="${sourceData?.update_interval || sourceData?.updateInterval || 3600}" min="60" style="width:100%;padding:0.5rem;border:1px solid #ddd;border-radius:4px;">
+                </div>
+                <div>
+                    <label>Описание</label>
+                    <textarea id="source-desc" rows="3" placeholder="Описание источника..." style="width:100%;padding:0.5rem;border:1px solid #ddd;border-radius:4px;">${sourceData?.description || ''}</textarea>
+                </div>
+                <div>
+                    <label><input type="checkbox" id="source-enabled" ${sourceData?.enabled ? 'checked' : ''}> Активен</label>
+                </div>
+                <div style="display:flex;gap:0.5rem;justify-content:flex-end;">
+                    <button type="button" class="button button-secondary" data-close-modal>Отмена</button>
+                    <button type="submit" class="button button-success">${submitLabel}</button>
+                </div>
+            </form>
+        </div>
+    `;
+    modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+    document.body.appendChild(modal);
+    return modal;
+}
+</script>

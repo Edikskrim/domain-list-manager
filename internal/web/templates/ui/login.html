@@ -1,0 +1,29 @@
+<h1 class="section-title">&#128275; Вход в систему</h1>
+
+{{ if .Error }}
+<div style="color:#d32f2f;padding:1rem;background:#f8d7da;border-radius:6px;margin-bottom:1rem;">
+    <strong>&#10060;</strong> {{ .Error }}
+</div>
+{{ end }}
+
+<div class="card">
+    <form method="POST" action="/ui/login" style="max-width:400px;">
+        <input type="hidden" name="redirect" value="{{ .Redirect }}">
+        
+        <div style="margin-bottom:1rem;">
+            <label style="display:block;margin-bottom:0.5rem;font-weight:600;">Имя пользователя</label>
+            <input type="text" name="username" required style="width:100%;padding:0.75rem;border:1px solid #ddd;border-radius:4px;font-size:1rem;">
+        </div>
+        
+        <div style="margin-bottom:1.5rem;">
+            <label style="display:block;margin-bottom:0.5rem;font-weight:600;">Пароль</label>
+            <input type="password" name="password" required style="width:100%;padding:0.75rem;border:1px solid #ddd;border-radius:4px;font-size:1rem;">
+        </div>
+        
+        <button type="submit" class="button" style="width:100%;padding:0.75rem;font-size:1rem;">&#x1F511; Войти</button>
+    </form>
+</div>
+
+<div style="margin-top:2rem;">
+    <a href="/ui/" class="button" style="text-decoration:none;">&#8592; На главную</a>
+</div>

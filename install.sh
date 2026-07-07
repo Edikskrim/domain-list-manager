@@ -17,6 +17,7 @@ VM_MEMORY="2048"
 VM_BRIDGE="vmbr0"
 FRONT_PORT="8080"
 GHCR_IMAGE="ghcr.io/edikskrim/domain-list-manager"
+RAW_URL="https://raw.githubusercontent.com/Edikskrim/domain-list-manager/main"
 
 # --------------- Цвета ---------------
 GREEN='\033[0;32m'
@@ -46,7 +47,7 @@ echo -e "${GREEN}OK: Proxmox хост найден, запущен от root.${N
 echo -e "${YELLOW}Определяю свободный VMID...${NC}"
 VMID=$(pvesh get /cluster/nextid 2>/dev/null)
 if [[ -z "$VMID" ]]; then
-    # fallback
+    # fallback: найди свободный
     VMID=99
     while pct status "$VMID" &>/dev/null; do
         VMID=$((VMID + 1))
@@ -72,21 +73,17 @@ pct create "$VMID" \
     "local:vztmpl/${DEBIAN_TEMPLATE}.tar.zst" \
     -features keyctl=1,nesting=1 \
     -arch "$ARCH" \
-    -hostname "$CONTAINER_HOSTNAME" \
+    -name "$CONTAINER_HOSTNAME" \
     -unprivileged 1 \
-    -cpus "$VM_CPU" \
+    -cores "$VM_CPU" \
     -memory "$VM_MEMORY" \
     -swap 512 \
     -ostype debian \
-    -disk "local-lvm:${VM_DISK_SIZE}" \
-    -net "name=eth0,bridge=${VM_BRIDGE},ip=dhcp,gw=dhcp" \
+    -rootfs "local-lvm:${VM_DISK_SIZE}" \
+    -net0 "name=eth0,bridge=${VM_BRIDGE},ip=dhcp,gw=dhcp" \
     -onboot 1 \
-    -start 0
+    -startup "up"
 
-if [[ $? -ne 0 ]]; then
-    echo -e "${RED}Ошибка при создании контейнера.${NC}"
-    exit 1
-fi
 echo -e "${GREEN}Контейнер создан.${NC}"
 
 # --------------- Запуск контейнера ---------------
@@ -121,8 +118,9 @@ pct exec "$VMID" -- sh -c '
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian bookworm stable" > /etc/apt/sources.list.d/docker.list
     apt-get update -qq
     apt-get install -y -qq docker-ce docker-ce-cli containerd.io docker-compose-plugin >/dev/null 2>&1
-    systemctl enable docker >/dev/null 2>&1 || true
-    systemctl start docker >/dev/null 2>&1 || true
+    systemctl enable --now docker
+    sleep 2
+    docker info >/dev/null 2>&1
 ' || DOCKER_EXIT=$?
 
 if [[ $DOCKER_EXIT -ne 0 ]]; then
@@ -131,13 +129,26 @@ if [[ $DOCKER_EXIT -ne 0 ]]; then
 fi
 echo -e "${GREEN}Docker установлен!${NC}"
 
+# --------------- Скачивание файлов для deployment ---------------
+echo -e "${YELLOW}Подготовка файлов...${NC}"
+TMP_DIR=$(mktemp -d)
+curl -fsSL "${RAW_URL}/docker-compose.yml" -o "${TMP_DIR}/docker-compose.yml"
+if [[ -f ".env" ]]; then
+    cp ".env" "${TMP_DIR}/.env"
+else
+    curl -fsSL "${RAW_URL}/.env.example" -o "${TMP_DIR}/.env"
+fi
+
 # --------------- Развертывание сервиса ---------------
 echo -e "${YELLOW}Разворачиваю сервис...${NC}"
 pct exec "$VMID" -- mkdir -p /opt/domain-list-manager
 
 # Копируем файлы внутрь контейнера
-pct push "$VMID" docker-compose.yml "/opt/domain-list-manager/docker-compose.yml"
-pct push "$VMID" .env "/opt/domain-list-manager/.env"
+pct push "$VMID" "${TMP_DIR}/docker-compose.yml" "/opt/domain-list-manager/docker-compose.yml"
+pct push "$VMID" "${TMP_DIR}/.env" "/opt/domain-list-manager/.env"
+
+# Очистка
+rm -rf "$TMP_DIR"
 
 COMPOSE_EXIT=0
 pct exec "$VMID" -- sh -c '
